@@ -51,8 +51,8 @@ including SW caching choices.
 
 ## precache\_urls
 
-An array-ref of URLs (relative is fine) to load into the SW's cache
-on installation. The SW URL will always be added to this.
+An array-ref of URLs that are relative to the SW's scope to load into
+the SW's cache on installation. The SW URL will always be added to this.
 
 ## network\_only
 

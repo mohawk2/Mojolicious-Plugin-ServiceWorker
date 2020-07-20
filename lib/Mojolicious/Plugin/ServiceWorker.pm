@@ -4,7 +4,7 @@ use Mojo::JSON;
 
 our $VERSION = '0.01';
 
-my $SW_URL = '/serviceworker.js';
+my $SW_URL = 'serviceworker.js';
 my @COPY_KEYS = qw(debug precache_urls network_only cache_only network_first);
 my %DEFAULT_LISTENERS = (
   install => [ <<'EOF' ],
@@ -129,8 +129,8 @@ including SW caching choices.
 
 =head2 precache_urls
 
-An array-ref of URLs (relative is fine) to load into the SW's cache
-on installation. The SW URL will always be added to this.
+An array-ref of URLs that are relative to the SW's scope to load into
+the SW's cache on installation. The SW URL will always be added to this.
 
 =head2 network_only
 
@@ -227,13 +227,13 @@ if ('serviceWorker' in navigator) {
 /* https://github.com/mohawk2/sw-turnkey */
 var cachename = "myAppCache";
 var config_raw = <%== Mojo::JSON::encode_json(app->serviceworker->config) %>;
-var config = {};
+var config = { scope: self.globalThis.registration.scope };
 var as_set = { network_only: true, cache_only: true, network_first: true };
 for (ck in config_raw) {
   if (!config_raw[ck]) continue;
   if (as_set[ck]) {
     config[ck] = {};
-    config_raw[ck].forEach(url => { config[ck][url] = 1 });
+    config_raw[ck].forEach(url => { config[ck][config.scope + url] = 1 });
   } else {
     config[ck] = config_raw[ck];
   }

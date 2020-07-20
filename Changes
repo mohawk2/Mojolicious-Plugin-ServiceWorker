@@ -1,4 +1,5 @@
 - serviceworker.add_event_listener
+- given URLs always relative
 
 0.01 2020-07-20
 - first version
