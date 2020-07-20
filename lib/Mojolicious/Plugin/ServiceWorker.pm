@@ -17,13 +17,10 @@ sub register {
     $c->render(template => 'serviceworker', format => 'js');
   }, 'serviceworker.route');
   $app->helper('serviceworker.route' => sub { $sw_route });
-  if (!$config{serviceworker_route}) {
-    # config only if SW not overridden
-    $config{precache_urls} = [
-      @{ $config{precache_urls} || [] },
-      $sw_route,
-    ];
-  }
+  $config{precache_urls} = [
+    @{ $config{precache_urls} || [] },
+    $sw_route,
+  ];
   my %config_copy = map {$config{$_} ? ($_ => $config{$_}) : ()} @COPY_KEYS;
   $app->helper('serviceworker.config' => sub { \%config_copy });
   push @{ $app->renderer->classes }, __PACKAGE__;
