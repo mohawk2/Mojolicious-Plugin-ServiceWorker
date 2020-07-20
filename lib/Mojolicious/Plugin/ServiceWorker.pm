@@ -232,6 +232,7 @@ var as_set = { network_only: true, cache_only: true, network_first: true };
 for (ck in config_raw) {
   if (!config_raw[ck]) continue;
   if (as_set[ck]) {
+    config[ck] = {};
     config_raw[ck].forEach(url => { config[ck][url] = 1 });
   } else {
     config[ck] = config_raw[ck];
