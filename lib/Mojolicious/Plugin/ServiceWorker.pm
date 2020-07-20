@@ -2,7 +2,7 @@ package Mojolicious::Plugin::ServiceWorker;
 use Mojo::Base 'Mojolicious::Plugin';
 use Mojo::JSON;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 my $SW_URL = 'serviceworker.js';
 my @COPY_KEYS = qw(debug precache_urls network_only cache_only network_first);
