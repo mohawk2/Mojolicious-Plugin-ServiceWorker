@@ -20,7 +20,18 @@ plugin 'ServiceWorker' => {
   precache_urls => [ 'js/important.js', '' ],
 };
 subtest 'default route' => sub {
-  $t->get_ok('/serviceworker.js')->status_is(200)->content_like(qr/self\.addEventListener/);
+  app->serviceworker->add_event_listener(push => <<'EOF');
+function(event) {
+  if (event.data) {
+    console.log('This push event has data: ', event.data.text());
+  } else {
+    console.log('This push event has no data.');
+  }
+}
+EOF
+  $t->get_ok('/serviceworker.js')->status_is(200)
+    ->content_like(qr/self\.addEventListener/)
+    ->content_like(qr/push event/);
   my $got = app->serviceworker->config;
   is_deeply $got, {
     precache_urls => [ 'js/important.js', '', '/serviceworker.js' ],

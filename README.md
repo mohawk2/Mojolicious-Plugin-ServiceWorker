@@ -10,6 +10,15 @@ Mojolicious::Plugin::ServiceWorker - plugin to add a Service Worker
       precache_urls => [
       ],
     };
+    app->serviceworker->add_event_listener(push => <<'EOF');
+    function(event) {
+      if (event.data) {
+        console.log('This push event has data: ', event.data.text());
+      } else {
+        console.log('This push event has no data.');
+      }
+    }
+    EOF
 
 # DESCRIPTION
 
@@ -80,6 +89,29 @@ The configured ["route\_sw"](#route_sw) route.
 
 The SW configuration (a hash-ref). Keys: `debug`, `precache_urls`,
 `network_only`, `cache_only`, `network_first`.
+
+## serviceworker.add\_event\_listener
+
+    my $config = $c->serviceworker->add_event_listener(push => <<'EOF');
+    function(event) {
+      if (event.data) {
+        console.log('This push event has data: ', event.data.text());
+      } else {
+        console.log('This push event has no data.');
+      }
+    }
+    EOF
+
+Add to the service worker an event listener. Arguments are the event
+name, and a JavaScript function expression that takes the correct args
+for that event.
+
+## serviceworker.event\_listeners
+
+    my $listeners = $c->serviceworker->event_listeners;
+
+Returns a hash-ref mapping event name to array-ref of function
+expressions as above. `install` and `fetch` are provided by default.
 
 # TEMPLATES
 

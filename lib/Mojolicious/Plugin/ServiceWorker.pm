@@ -6,6 +6,41 @@ our $VERSION = '0.01';
 
 my $SW_URL = '/serviceworker.js';
 my @COPY_KEYS = qw(debug precache_urls network_only cache_only network_first);
+my %DEFAULT_LISTENERS = (
+  install => [ <<'EOF' ],
+event => {
+  console.log("Installing SW...");
+  event.waitUntil(caches.open(cachename).then(cache => {
+    console.log("Caching: ", config.precache_urls);
+    return cache.addAll(config.precache_urls);
+  }).then(() => console.log("The SW is now installed")));
+}
+EOF
+  fetch => [ <<'EOF' ],
+event => {
+  var url = event.request.url;
+  if (maybeMatch(config, 'network_only', url)) {
+    if (config.debug) console.log('network_only', url);
+    return event.respondWith(fetch(event.request).catch(() => {}));
+  }
+  return caches.open(cachename).then(
+    cache => cache.match(event.request)
+  ).then(cacheResponse => {
+    if (cacheResponse && maybeMatch(config, 'cache_only', url)) {
+      if (config.debug) console.log('cache_only', url);
+      return cacheResponse;
+    }
+    if (maybeMatch(config, 'network_first', url)) {
+      if (config.debug) console.log('network_first', url);
+      return cachingFetchOrCached(event.request, cacheResponse);
+    }
+    if (config.debug) console.log('cache_first', url);
+    var cF = cachingFetch(event.request).catch(() => {});
+    return cacheResponse || cF;
+  });
+}
+EOF
+);
 
 sub register {
   my ($self, $app, $conf) = @_;
@@ -14,7 +49,11 @@ sub register {
   my $r = $app->routes;
   $r->get($sw_route => sub {
     my ($c) = @_;
-    $c->render(template => 'serviceworker', format => 'js');
+    $c->render(
+      template => 'serviceworker',
+      format => 'js',
+      listeners => $c->serviceworker->event_listeners,
+    );
   }, 'serviceworker.route');
   $app->helper('serviceworker.route' => sub { $sw_route });
   $config{precache_urls} = [
@@ -24,6 +63,12 @@ sub register {
   my %config_copy = map {$config{$_} ? ($_ => $config{$_}) : ()} @COPY_KEYS;
   $app->helper('serviceworker.config' => sub { \%config_copy });
   push @{ $app->renderer->classes }, __PACKAGE__;
+  my %event_listeners = %DEFAULT_LISTENERS;
+  $app->helper('serviceworker.event_listeners' => sub { \%event_listeners });
+  $app->helper('serviceworker.add_event_listener' => sub {
+    my ($c, $event, $expr) = @_;
+    $event_listeners{$event} = [ @{ $event_listeners{$event} || [] }, $expr ];
+  });
   $self;
 }
 
@@ -43,6 +88,15 @@ Mojolicious::Plugin::ServiceWorker - plugin to add a Service Worker
     precache_urls => [
     ],
   };
+  app->serviceworker->add_event_listener(push => <<'EOF');
+  function(event) {
+    if (event.data) {
+      console.log('This push event has data: ', event.data.text());
+    } else {
+      console.log('This push event has no data.');
+    }
+  }
+  EOF
 
 =head1 DESCRIPTION
 
@@ -114,6 +168,29 @@ The configured L</route_sw> route.
 The SW configuration (a hash-ref). Keys: C<debug>, C<precache_urls>,
 C<network_only>, C<cache_only>, C<network_first>.
 
+=head2 serviceworker.add_event_listener
+
+  my $config = $c->serviceworker->add_event_listener(push => <<'EOF');
+  function(event) {
+    if (event.data) {
+      console.log('This push event has data: ', event.data.text());
+    } else {
+      console.log('This push event has no data.');
+    }
+  }
+  EOF
+
+Add to the service worker an event listener. Arguments are the event
+name, and a JavaScript function expression that takes the correct args
+for that event.
+
+=head2 serviceworker.event_listeners
+
+  my $listeners = $c->serviceworker->event_listeners;
+
+Returns a hash-ref mapping event name to array-ref of function
+expressions as above. C<install> and C<fetch> are provided by default.
+
 =head1 TEMPLATES
 
 Various templates are available for including in the app's templates:
@@ -182,34 +259,9 @@ function cachingFetchOrCached(request, cacheResponse) {
 function maybeMatch(config, key, value) {
   return config[key] && config[key][value];
 }
+% for my $e (sort keys %$listeners) {
+  % for my $l (@{ $listeners->{$e} }) {
 
-self.addEventListener("install", event => {
-  console.log("Installing SW...");
-  event.waitUntil(caches.open(cachename).then(cache => {
-    console.log("Caching: ", config.precache_urls);
-    return cache.addAll(config.precache_urls);
-  }).then(() => console.log("The SW is now installed")));
-});
-
-self.addEventListener("fetch", event => {
-  var url = event.request.url;
-  if (maybeMatch(config, 'network_only', url)) {
-    if (config.debug) console.log('network_only', url);
-    return event.respondWith(fetch(event.request).catch(() => {}));
-  }
-  return caches.open(cachename).then(
-    cache => cache.match(event.request)
-  ).then(cacheResponse => {
-    if (cacheResponse && maybeMatch(config, 'cache_only', url)) {
-      if (config.debug) console.log('cache_only', url);
-      return cacheResponse;
-    }
-    if (maybeMatch(config, 'network_first', url)) {
-      if (config.debug) console.log('network_first', url);
-      return cachingFetchOrCached(event.request, cacheResponse);
-    }
-    if (config.debug) console.log('cache_first', url);
-    var cF = cachingFetch(event.request).catch(() => {});
-    return cacheResponse || cF;
-  });
-});
+self.addEventListener("<%= $e %>", <%== $l %>);
+  % }
+% }
